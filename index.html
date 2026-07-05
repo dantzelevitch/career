@@ -1607,7 +1607,7 @@ const AI_RISK = new Set([
 const WORLDS = [
   {id:"B",label:"The Crafted World",emoji:"🌎",desc:"Buildings, cars, clothing, furniture, shoes — you get it",color:"#E67E22"},
   {id:"L",label:"The Living World",emoji:"🧬",desc:"Health, life, and nature",color:"#27AE60"},
-  {id:"P",label:"People, Service, and Society",emoji:"👥",desc:"The things that keep humanity going",color:"#9B59B6"},
+  {id:"P",label:"People, Service, and Society",emoji:"👥",desc:"What keeps humanity going",color:"#9B59B6"},
   {id:"A",label:"Arts & Entertainment",emoji:"🎭",desc:"Inspiring through arts, entertainment, and sports",color:"#E74C3C"},
   {id:"D",label:"The Digital World",emoji:"🌐",desc:"The world in code — languages that only machines understand",color:"#3498DB"},
   {id:"N",label:"The Natural Forces",emoji:"⚡",desc:"Aerospace, energy, and science — all things governed by the universe",color:"#F39C12"},
@@ -1624,7 +1624,7 @@ const CONFIRM_WORDS = {
 
 const Q_CONFIG = [
   {id:"q2",label:"Natural Strengths",q:"What comes most naturally to you?",sub:"Spread 10 points — more where you're strongest.",
-   opts:[{key:"think",label:"Thinking & problem-solving",emoji:"🧠"},{key:"hands",label:"Working with my hands",emoji:"🤲"},{key:"connect",label:"Being outgoing and extroverted",emoji:"🤝"},{key:"create",label:"Creating & expressing",emoji:"✨"},{key:"depend",label:"Being the person people can count on",emoji:"💯"}]},
+   opts:[{key:"think",label:"Thinking & problem-solving",emoji:"🧠"},{key:"hands",label:"Being hands-on",emoji:"🤲"},{key:"connect",label:"Being outgoing and extroverted",emoji:"🤝"},{key:"create",label:"Creating & expressing",emoji:"✨"},{key:"depend",label:"Being the person people can count on",emoji:"💯"}]},
   {id:"q3",label:"Workplace",q:"A typical workday — where's your body?",sub:"Distribute 10 points.",
    opts:[{key:"desk",label:"In a chair",emoji:"🖥️"},{key:"feet",label:"On my feet",emoji:"🦶"},{key:"field",label:"Out on location",emoji:"📍"}]},
   {id:"q4",label:"Social Style",q:"Your work — which fits?",sub:"Distribute 10 points.",
@@ -1748,10 +1748,12 @@ function CareerQuiz() {
       const ns7=c.q7.reduce((sum, t) => sum + (a7[t] || 0), 0);
       const ns8=a8[c.q8]||0;
       // Disqualify if Q2 or Q3 sum is 0
-      if (ns2 === 0 || ns3 === 0) {
+      // Also disqualify if ANY career Q2 tag is not in selectedStrengths
+      const strengthsMatch = selectedStrengths.length > 0 ? c.q2.every(t => selectedStrengths.includes(t)) : true;
+      if (ns2 === 0 || ns3 === 0 || !strengthsMatch) {
         // Still push with 0 new score so classic can show it
       }
-      const newScore = (ns2 === 0 || ns3 === 0) ? 0 :
+      const newScore = (ns2 === 0 || ns3 === 0 || !strengthsMatch) ? 0 :
         (wPts*1.2) + (ns2*2.0) + ns3 + ns4 + ns5 + ns6 + (ns7*0.75) + ns8;
 
       all.push({name:c.n, world:c.w, score:classicScore, newScore, prefSum:cPrefSum, wPts,
