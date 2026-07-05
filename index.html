@@ -1681,6 +1681,7 @@ function CareerQuiz() {
   const [scoringModel, setScoringModel] = useState("new");
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [selectedStrengths, setSelectedStrengths] = useState([]);
 
   const go = (s) => { setFadeIn(false); setTimeout(()=>{setScreen(s);setFadeIn(true);},200); };
   const pts = answers[Q_CONFIG[qIdx]?.id] || {};
@@ -1751,7 +1752,7 @@ function CareerQuiz() {
         // Still push with 0 new score so classic can show it
       }
       const newScore = (ns2 === 0 || ns3 === 0) ? 0 :
-        (wPts*1.2) + (ns2*1.4) + ns3 + ns4 + ns5 + ns6 + (ns7*0.75) + ns8;
+        (wPts*1.2) + (ns2*2.0) + ns3 + ns4 + ns5 + ns6 + (ns7*0.75) + ns8;
 
       all.push({name:c.n, world:c.w, score:classicScore, newScore, prefSum:cPrefSum, wPts,
         s2:cs2,s3:cs3,s4:cs4,s5:cs5,s6:cs6,s7:cs7,s8:cs8,
@@ -1875,21 +1876,59 @@ function CareerQuiz() {
         <div style={{flex:1,padding:"20px 20px 24px",display:"flex",flexDirection:"column"}}>
           
           <h2 style={{fontSize:24,fontWeight:700,marginBottom:6,lineHeight:1.3}}>{q.q}</h2>
-          <p style={{fontSize:14,color:"#6B7B8D",marginBottom:20}}>{q.sub}</p>
-          <div style={{flex:1,overflowY:"auto"}}>
-            <PointDistributor opts={q.opts} points={pts} setPoints={p=>setAnswers({...answers,[q.id]:p})} />
-          </div>
-          <div style={{display:"flex",gap:10,marginTop:12}}>
-            {qIdx>0&&<button onClick={()=>{if(isLastQ && !showInterstitial){setShowInterstitial(false);setQIdx(qIdx-1);}else{setQIdx(qIdx-1);}}} style={{padding:"16px 24px",borderRadius:14,border:"2px solid #2A3442",background:"transparent",color:"#8B95A5",fontSize:16,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>← Back</button>}
-            <button onClick={()=>{
-              if(isFirstQ){setShowConfirmation(true);}
-              else if(isPreLastQ){setShowInterstitial(true);}
-              else if(isLastQ){score();go("results");}
-              else{setQIdx(qIdx+1);}
-            }} disabled={total!==10} style={{flex:1,padding:"16px",borderRadius:14,border:"none",background:total===10?"linear-gradient(135deg,#4ECDC4,#44B8B0)":"#2A3442",color:total===10?"#0F1923":"#5A6A7A",fontSize:18,fontWeight:700,cursor:total===10?"pointer":"not-allowed",fontFamily:"inherit"}}>
-              {isLastQ?"See my results →":"Continue →"}
-            </button>
-          </div>
+          {/* Phase 1: Pick 3 strengths */}
+          {isFirstQ && selectedStrengths.length < 3 ? (
+            <>
+              <p style={{fontSize:14,color:"#6B7B8D",marginBottom:20}}>Pick your top 3.</p>
+              <div style={{flex:1,overflowY:"auto"}}>
+                {q.opts.map(o => {
+                  const isSelected = selectedStrengths.includes(o.key);
+                  return (
+                    <button key={o.key} onClick={()=>{
+                      if(isSelected) setSelectedStrengths(selectedStrengths.filter(k=>k!==o.key));
+                      else if(selectedStrengths.length<3) setSelectedStrengths([...selectedStrengths,o.key]);
+                    }} style={{
+                      width:"100%",padding:"14px 16px",borderRadius:12,border:isSelected?"2px solid #4ECDC4":"2px solid #2A3442",
+                      background:isSelected?"#4ECDC415":"#1A2332",marginBottom:8,cursor:"pointer",
+                      display:"flex",alignItems:"center",gap:12,fontFamily:"inherit",textAlign:"left"
+                    }}>
+                      <span style={{fontSize:22}}>{o.emoji}</span>
+                      <span style={{fontSize:16,fontWeight:500,color:isSelected?"#4ECDC4":"#8B95A5"}}>{o.label}</span>
+                      {isSelected && <span style={{marginLeft:"auto",color:"#4ECDC4",fontWeight:700}}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{fontSize:13,color:"#5A6A7A",textAlign:"right",marginTop:8}}>{3 - selectedStrengths.length} remaining</p>
+            </>
+          ) : (
+            <>
+              <p style={{fontSize:14,color:"#6B7B8D",marginBottom:20}}>{isFirstQ ? "Now spread 10 points — more where you're strongest." : q.sub}</p>
+              <div style={{flex:1,overflowY:"auto"}}>
+                <PointDistributor opts={isFirstQ ? q.opts.filter(o=>selectedStrengths.includes(o.key)) : q.opts} points={pts} setPoints={p=>{
+                  if(isFirstQ){
+                    const fullPts = {...p};
+                    q.opts.forEach(o=>{if(!selectedStrengths.includes(o.key)) fullPts[o.key]=0;});
+                    setAnswers({...answers,[q.id]:fullPts});
+                  } else {
+                    setAnswers({...answers,[q.id]:p});
+                  }
+                }} />
+              </div>
+              <div style={{display:"flex",gap:10,marginTop:12}}>
+                {isFirstQ && <button onClick={()=>{setSelectedStrengths([]);setAnswers({...answers,q2:{}});}} style={{padding:"16px 24px",borderRadius:14,border:"2px solid #2A3442",background:"transparent",color:"#8B95A5",fontSize:16,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>← Pick again</button>}
+                {qIdx>0&&!isFirstQ&&<button onClick={()=>{if(isLastQ){setShowInterstitial(false);setQIdx(qIdx-1);}else{setQIdx(qIdx-1);}}} style={{padding:"16px 24px",borderRadius:14,border:"2px solid #2A3442",background:"transparent",color:"#8B95A5",fontSize:16,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>← Back</button>}
+                <button onClick={()=>{
+                  if(isFirstQ){setShowConfirmation(true);}
+                  else if(isPreLastQ){setShowInterstitial(true);}
+                  else if(isLastQ){score();go("results");}
+                  else{setQIdx(qIdx+1);}
+                }} disabled={total!==10} style={{flex:1,padding:"16px",borderRadius:14,border:"none",background:total===10?"linear-gradient(135deg,#4ECDC4,#44B8B0)":"#2A3442",color:total===10?"#0F1923":"#5A6A7A",fontSize:18,fontWeight:700,cursor:total===10?"pointer":"not-allowed",fontFamily:"inherit"}}>
+                  {isLastQ?"See my results →":"Continue →"}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
