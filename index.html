@@ -1636,25 +1636,31 @@ const Q_CONFIG = [
    opts:WORLDS.map(w=>({key:w.id,label:w.label,emoji:w.emoji,sub:w.desc}))},
 ];
 
-const PointDistributor = ({opts, points, setPoints, maxPts=10}) => {
+const PointDistributor = ({opts, points, setPoints, maxPts=10, maxActive=0}) => {
   const total = Object.values(points).reduce((a,b)=>a+b,0);
   const remaining = maxPts - total;
+  const activeCount = Object.values(points).filter(v => v > 0).length;
   return (
     <div>
-      {opts.map(o => (
-        <div key={o.key} style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,padding:"12px 14px",background:"#1A2332",borderRadius:14,border:`2px solid ${(points[o.key]||0)>0?"#4ECDC4":"#2A3442"}`}}>
+      {opts.map(o => {
+        const val = points[o.key] || 0;
+        const isActive = val > 0;
+        const isLocked = maxActive > 0 && !isActive && activeCount >= maxActive;
+        return (
+        <div key={o.key} style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,padding:"12px 14px",background:isLocked?"#151d27":"#1A2332",borderRadius:14,border:`2px solid ${isActive?"#4ECDC4":isLocked?"#1A2332":"#2A3442"}`,opacity:isLocked?0.4:1,transition:"opacity 0.3s ease"}}>
           <span style={{fontSize:24,flexShrink:0}}>{o.emoji}</span>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:16,fontWeight:600,color:(points[o.key]||0)>0?"#F0F4F8":"#B0BAC5",lineHeight:1.3}}>{o.label}</div>
+            <div style={{fontSize:16,fontWeight:600,color:isActive?"#F0F4F8":"#B0BAC5",lineHeight:1.3}}>{o.label}</div>
             {o.sub&&<div style={{fontSize:13,color:"#6B7B8D",lineHeight:1.3,marginTop:2}}>{o.sub}</div>}
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-            <button onClick={()=>{if((points[o.key]||0)>0)setPoints({...points,[o.key]:(points[o.key]||0)-1})}} style={{width:36,height:36,borderRadius:10,border:"none",background:(points[o.key]||0)>0?"#2A3442":"#1A2332",color:(points[o.key]||0)>0?"#F0F4F8":"#3A4452",fontSize:20,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>−</button>
-            <span style={{fontSize:22,fontWeight:800,color:(points[o.key]||0)>0?"#4ECDC4":"#5A6A7A",minWidth:28,textAlign:"center"}}>{points[o.key]||0}</span>
-            <button onClick={()=>{if(remaining>0)setPoints({...points,[o.key]:(points[o.key]||0)+1})}} style={{width:36,height:36,borderRadius:10,border:"none",background:remaining>0?"#2A3442":"#1A2332",color:remaining>0?"#F0F4F8":"#3A4452",fontSize:20,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>+</button>
+            <button onClick={()=>{if(val>0)setPoints({...points,[o.key]:val-1})}} style={{width:36,height:36,borderRadius:10,border:"none",background:val>0?"#2A3442":"#1A2332",color:val>0?"#F0F4F8":"#3A4452",fontSize:20,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>−</button>
+            <span style={{fontSize:22,fontWeight:800,color:val>0?"#4ECDC4":"#5A6A7A",minWidth:28,textAlign:"center"}}>{val}</span>
+            <button onClick={()=>{if(remaining>0 && !isLocked)setPoints({...points,[o.key]:val+1})}} style={{width:36,height:36,borderRadius:10,border:"none",background:(remaining>0 && !isLocked)?"#2A3442":"#1A2332",color:(remaining>0 && !isLocked)?"#F0F4F8":"#3A4452",fontSize:20,fontWeight:700,cursor:isLocked?"not-allowed":"pointer",fontFamily:"inherit"}}>+</button>
           </div>
         </div>
-      ))}
+        );
+      })}
       <div style={{display:"flex",justifyContent:"flex-end",marginTop:8,paddingRight:14}}>
         <span style={{fontSize:14,color:"#6B7B8D",marginRight:8}}>{remaining>0?"remaining":""}</span>
         <span style={{fontSize:22,fontWeight:800,color:remaining===0?"#4ECDC4":"#FF6B6B",minWidth:28,textAlign:"center"}}>{remaining}</span>
@@ -1676,7 +1682,6 @@ function CareerQuiz() {
   const [scoringModel, setScoringModel] = useState("new");
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [selectedStrengths, setSelectedStrengths] = useState([]);
 
   const go = (s) => { setFadeIn(false); setTimeout(()=>{setScreen(s);setFadeIn(true);},200); };
   const pts = answers[Q_CONFIG[qIdx]?.id] || {};
@@ -1744,7 +1749,8 @@ function CareerQuiz() {
       const ns8=a8[c.q8]||0;
       // Disqualify if Q2 or Q3 sum is 0
       // Also disqualify if ANY career Q2 tag is not in selectedStrengths
-      const strengthsMatch = selectedStrengths.length > 0 ? c.q2.every(t => selectedStrengths.includes(t)) : true;
+      const activeStrengths = Object.entries(a.q2 || {}).filter(([k,v]) => v > 0).map(([k]) => k);
+      const strengthsMatch = activeStrengths.length > 0 ? c.q2.every(t => activeStrengths.includes(t)) : true;
       if (ns2 === 0 || ns3 === 0 || !strengthsMatch) {
         // Still push with 0 new score so classic can show it
       }
@@ -1873,59 +1879,21 @@ function CareerQuiz() {
         <div style={{flex:1,padding:"20px 20px 24px",display:"flex",flexDirection:"column"}}>
           
           <h2 style={{fontSize:24,fontWeight:700,marginBottom:6,lineHeight:1.3}}>{q.q}</h2>
-          {/* Phase 1: Pick 3 strengths */}
-          {isFirstQ && selectedStrengths.length < 3 ? (
-            <>
-              <p style={{fontSize:14,color:"#6B7B8D",marginBottom:20}}>Pick your top 3.</p>
-              <div style={{flex:1,overflowY:"auto"}}>
-                {q.opts.map(o => {
-                  const isSelected = selectedStrengths.includes(o.key);
-                  return (
-                    <button key={o.key} onClick={()=>{
-                      if(isSelected) setSelectedStrengths(selectedStrengths.filter(k=>k!==o.key));
-                      else if(selectedStrengths.length<3) setSelectedStrengths([...selectedStrengths,o.key]);
-                    }} style={{
-                      width:"100%",padding:"14px 16px",borderRadius:12,border:isSelected?"2px solid #4ECDC4":"2px solid #2A3442",
-                      background:isSelected?"#4ECDC415":"#1A2332",marginBottom:8,cursor:"pointer",
-                      display:"flex",alignItems:"center",gap:12,fontFamily:"inherit",textAlign:"left"
-                    }}>
-                      <span style={{fontSize:22}}>{o.emoji}</span>
-                      <span style={{fontSize:16,fontWeight:500,color:isSelected?"#4ECDC4":"#8B95A5"}}>{o.label}</span>
-                      {isSelected && <span style={{marginLeft:"auto",color:"#4ECDC4",fontWeight:700}}>✓</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              <p style={{fontSize:13,color:"#5A6A7A",textAlign:"right",marginTop:8}}>{3 - selectedStrengths.length} remaining</p>
-            </>
-          ) : (
-            <>
-              <p style={{fontSize:14,color:"#6B7B8D",marginBottom:20}}>{isFirstQ ? "Now spread 10 points — more where you're strongest." : q.sub}</p>
-              <div style={{flex:1,overflowY:"auto"}}>
-                <PointDistributor opts={isFirstQ ? q.opts.filter(o=>selectedStrengths.includes(o.key)) : q.opts} points={pts} setPoints={p=>{
-                  if(isFirstQ){
-                    const fullPts = {...p};
-                    q.opts.forEach(o=>{if(!selectedStrengths.includes(o.key)) fullPts[o.key]=0;});
-                    setAnswers({...answers,[q.id]:fullPts});
-                  } else {
-                    setAnswers({...answers,[q.id]:p});
-                  }
-                }} />
-              </div>
-              <div style={{display:"flex",gap:10,marginTop:12}}>
-                {isFirstQ && <button onClick={()=>{setSelectedStrengths([]);setAnswers({...answers,q2:{}});}} style={{padding:"16px 24px",borderRadius:14,border:"2px solid #2A3442",background:"transparent",color:"#8B95A5",fontSize:16,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>← Pick again</button>}
-                {qIdx>0&&!isFirstQ&&<button onClick={()=>{if(isLastQ){setShowInterstitial(false);setQIdx(qIdx-1);}else{setQIdx(qIdx-1);}}} style={{padding:"16px 24px",borderRadius:14,border:"2px solid #2A3442",background:"transparent",color:"#8B95A5",fontSize:16,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>← Back</button>}
-                <button onClick={()=>{
-                  if(isFirstQ){setShowConfirmation(true);}
-                  else if(isPreLastQ){setShowInterstitial(true);}
-                  else if(isLastQ){score();go("results");}
-                  else{setQIdx(qIdx+1);}
-                }} disabled={total!==10} style={{flex:1,padding:"16px",borderRadius:14,border:"none",background:total===10?"linear-gradient(135deg,#4ECDC4,#44B8B0)":"#2A3442",color:total===10?"#0F1923":"#5A6A7A",fontSize:18,fontWeight:700,cursor:total===10?"pointer":"not-allowed",fontFamily:"inherit"}}>
-                  {isLastQ?"See my results →":"Continue →"}
-                </button>
-              </div>
-            </>
-          )}
+          <p style={{fontSize:14,color:"#6B7B8D",marginBottom:20}}>{q.sub}</p>
+          <div style={{flex:1,overflowY:"auto"}}>
+            <PointDistributor opts={q.opts} points={pts} setPoints={p=>setAnswers({...answers,[q.id]:p})} maxActive={isFirstQ?3:0} />
+          </div>
+          <div style={{display:"flex",gap:10,marginTop:12}}>
+            {qIdx>0&&<button onClick={()=>{if(isLastQ){setShowInterstitial(false);setQIdx(qIdx-1);}else{setQIdx(qIdx-1);}}} style={{padding:"16px 24px",borderRadius:14,border:"2px solid #2A3442",background:"transparent",color:"#8B95A5",fontSize:16,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>← Back</button>}
+            <button onClick={()=>{
+              if(isFirstQ){setShowConfirmation(true);}
+              else if(isPreLastQ){setShowInterstitial(true);}
+              else if(isLastQ){score();go("results");}
+              else{setQIdx(qIdx+1);}
+            }} disabled={total!==10} style={{flex:1,padding:"16px",borderRadius:14,border:"none",background:total===10?"linear-gradient(135deg,#4ECDC4,#44B8B0)":"#2A3442",color:total===10?"#0F1923":"#5A6A7A",fontSize:18,fontWeight:700,cursor:total===10?"pointer":"not-allowed",fontFamily:"inherit"}}>
+              {isLastQ?"See my results →":"Continue →"}
+            </button>
+          </div>
         </div>
       </div>
     );
